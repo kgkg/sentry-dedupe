@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-dev — 2026-10-20
+## 0.1.0 — 2026-10-20
 
 - Implement Sentry SDK 4.x before_send composition, stable identity, context, bounded diagnostics and fail-closed admission.
 - Add shared cooldown/global-quota/counter policy, native SQLite3 and atomic local JSON backends.
