@@ -36,6 +36,24 @@ final class FingerprintTest extends TestCase
         self::assertNotSame($s->fingerprint($a), $s->fingerprint($b));
         self::assertSame(['a', 'b'], $a->getFingerprint());
     }
+    /** @return array<string, array{array<mixed>, string}> */
+    public function invalidCustomComponents(): array
+    {
+        return [
+            'non-string' => [[123], 'custom_component_size'],
+            'oversized' => [[str_repeat('x', 1025)], 'custom_component_size'],
+            'sparse' => [[1 => 'a'], 'custom_components'],
+            'too many' => [array_fill(0, 17, 'a'), 'custom_components'],
+        ];
+    }
+    /** @dataProvider invalidCustomComponents */
+    public function testInvalidCustomComponents(array $components, string $reason): void
+    {
+        $event = $this->message('a')->setFingerprint($components);
+        $this->expectException(FingerprintException::class);
+        $this->expectExceptionMessage($reason);
+        $this->strategy()->fingerprint($event);
+    }
     public function testTemplateExcludesParameterValuesReleaseAndEventTimestamp(): void
     {
         $s = $this->strategy();

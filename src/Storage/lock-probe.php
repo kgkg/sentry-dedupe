@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 // Standalone process: no SDK or application error handler.
+if (!isset($argv) || count($argv) !== 4) { exit(1); }
 [$script, $backend, $path, $mode] = $argv;
 $file = null;
 $db = null;

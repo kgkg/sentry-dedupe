@@ -17,12 +17,10 @@ final class DefaultFingerprintStrategy implements FingerprintStrategyInterface
     public function fingerprint(Event $event, ?EventHint $hint = null): string
     {
         $this->bytes = 0;
-        $custom = $event->getFingerprint();
-        if (count($custom) > 16 || ($custom !== [] && array_keys($custom) !== range(0, count($custom) - 1))) { throw new FingerprintException('custom_components'); }
+        $custom = $this->customComponents($event->getFingerprint());
         $automatic = null;
         $identity = [];
         foreach ($custom as $component) {
-            if (!is_string($component) || strlen($component) > 1024) { throw new FingerprintException('custom_component_size'); }
             if ($component === '{{ default }}') {
                 if ($automatic === null) { $automatic = $this->automatic($event); }
                 $identity[] = ['automatic' => $automatic];
@@ -35,6 +33,21 @@ final class DefaultFingerprintStrategy implements FingerprintStrategyInterface
         $json = Config::canonical($input);
         if (strlen($json) > 262144) { throw new FingerprintException('identity_size'); }
         return hash('sha256', $json);
+    }
+    /**
+     * Validate SDK input at runtime: its string[] PHPDoc is not enforced by PHP.
+     * @param array<mixed> $components
+     * @return list<string>
+     */
+    private function customComponents(array $components): array
+    {
+        if (count($components) > 16 || ($components !== [] && array_keys($components) !== range(0, count($components) - 1))) { throw new FingerprintException('custom_components'); }
+        $result = [];
+        foreach ($components as $component) {
+            if (!is_string($component) || strlen($component) > 1024) { throw new FingerprintException('custom_component_size'); }
+            $result[] = $component;
+        }
+        return $result;
     }
     /** @return array<string, mixed> */
     private function automatic(Event $event): array
