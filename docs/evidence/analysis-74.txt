@@ -1,5 +1,5 @@
 
- [OK] No errors                                                                                                        
+ [OK] No errors
 
 es was released on July 17th 2025,
 that's 460 days ago.
