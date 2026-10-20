@@ -71,28 +71,46 @@ Admitted events receive context `sentry_dedupe` with their hash, counters and ad
 
 Unknown keys and incorrect types throw `ConfigurationException`. Numeric strings require explicit conversion by the application. Configuration is immutable. `toSafeArray()` contains local configuration, including paths and regex rules, without event payloads or DSNs.
 
-| Setting | Default / constraint |
-|---|---|
-| namespace | Required, 1–200 bytes, UTF-8 without control characters |
-| backend | Required: `sqlite` or `json` |
-| sqlite.path / json.directory | Required for the selected backend; absolute local path without dot segments/stream wrappers |
-| sqlite.journal_mode | `WAL`; alternatively `DELETE` |
-| sqlite.synchronous | `FULL`, required |
-| json.max_state_bytes | 16 MiB; range 1–256 MiB |
-| interval_seconds | 3600; range 1–31,536,000 |
-| global_limit.max_events | 100; positive integer, no unlimited mode |
-| global_limit.window_seconds | 3600; range 1–31,536,000 |
-| lock_timeout_ms | 100; range 1–5000 |
-| retention_seconds | 604800; at least cooldown and global window |
-| max_fingerprints | 10000; range 1–100000 |
-| event_context | true |
-| fingerprint.version | `fp-v1` |
-| fingerprint.project_root | null; set the application's absolute root explicitly |
-| fingerprint.deployment_prefixes | map of absolute directories to tokens, e.g. `['/srv/releases/build-1' => '<deploy>']` |
-| fingerprint.include_release / include_line | false / true |
-| fingerprint.max_frames | 5; range 1–20 |
-| fingerprint.normalization_rules | Ordered `['pattern' => '/order_id=[0-9]+/', 'replacement' => 'order_id=<id>']` pairs |
-| fingerprint.strategy_id | `default-fp-v1`; custom strategy requires an explicit stable ID |
+Only `namespace`, `backend`, and the selected backend's storage path are required. Set `fingerprint.project_root` explicitly for path normalization; the remaining settings can usually keep their defaults. With the defaults, the same fingerprint reserves at most one send attempt per 3600 seconds, and all fingerprints in a namespace share a budget of 100 attempts per fixed UTC hour.
+
+### Application and storage
+
+| Setting | Default / constraint | Purpose |
+|---|---|---|
+| `namespace` | Required, 1–200 bytes, UTF-8 without control characters | Application-defined name separating deduplication state, counters and quota, e.g. `shop:production`. It does not need to contain a Sentry project ID. Use different names for independent applications/environments, and the same name/configuration/store for cooperating workers. |
+| `backend` | Required: `sqlite` or `json` | Selects the persistent storage implementation. Only the selected backend's storage path is required. |
+| `sqlite.path` | Absolute local path without dot segments/stream wrappers | Location of the SQLite database. The service user needs access to the file and write access to its directory for SQLite sidecar files. Different namespaces may share one database, but still have separate quotas and counters. |
+| `sqlite.journal_mode` | `WAL`; alternatively `DELETE` | SQLite journaling mode. `WAL` permits readers alongside a writer; `DELETE` uses a rollback journal. Writes still serialize in either mode. |
+| `sqlite.synchronous` | `FULL`, required | SQLite synchronization level for durable commits, subject to filesystem/hardware guarantees. Weaker values are rejected. |
+| `json.directory` | Absolute local path without dot segments/stream wrappers | Parent directory for JSON storage. Each namespace gets its own hashed subdirectory with a snapshot and lockfile. Unused with SQLite. |
+| `json.max_state_bytes` | 16777216 bytes (16 MiB); range 1–256 MiB | Bounds the JSON snapshot size. Exceeding the bound causes a storage failure and suppresses the event rather than silently discarding history. Unused with SQLite. |
+
+### Admission limits and maintenance
+
+| Setting | Default / constraint | Purpose |
+|---|---|---|
+| `interval_seconds` | 3600 seconds; range 1–31,536,000 | Cooldown between admitted occurrences of the same fingerprint. Repeats during the cooldown are counted and suppressed. Expiry does not send anything automatically; a new occurrence is required. |
+| `global_limit.max_events` | 100; positive integer, no unlimited mode | Maximum send attempts admitted across all fingerprints in one namespace during each global window. This is not a server-wide limit across namespaces. |
+| `global_limit.window_seconds` | 3600 seconds; range 1–31,536,000 | Length of the fixed quota window, aligned to Unix time in UTC. With the default, the shared quota renews at each UTC hour boundary; per-fingerprint cooldowns remain independent. |
+| `lock_timeout_ms` | 100 milliseconds; range 1–5000 | Bounds waiting for storage locks. If the deadline is exceeded, the event is suppressed. It does not bound stalled OS syscalls. |
+| `retention_seconds` | 604800 seconds (7 days); at least cooldown and global window | Retention horizon used by explicit `cleanup` to remove eligible old records/buckets. Cleanup preserves active cooldowns, current quota and lifetime sums. This setting does not schedule cleanup. |
+| `max_fingerprints` | 10000; range 1–100000 | Maximum retained fingerprint records per namespace. At capacity, new fingerprints are suppressed while existing fingerprints continue normally. Cleanup can free capacity. |
+| `event_context` | `true` | Adds the local hash and admission-time counters to the admitted event's `sentry_dedupe` context. An existing context with that name is preserved. Set to `false` to omit this enrichment; deduplication still runs. |
+
+### Fingerprint identity
+
+These settings control which occurrences the default strategy considers the same error. They do not change Sentry's server-side grouping. Changing fingerprint settings or strategy requires a new namespace, which starts a fresh budget and deduplication history.
+
+| Setting | Default / constraint | Purpose |
+|---|---|---|
+| `fingerprint.version` | `fp-v1`; only supported value | Identifies the fingerprint format. Keep the supported value; this is not the application's release version. |
+| `fingerprint.project_root` | `null`; otherwise an absolute local path | Normalizes occurrences of the application's root path to `<app>` in identity text. It does not determine which stack frames are marked as application frames; those flags come from the SDK. |
+| `fingerprint.deployment_prefixes` | `[]`; map of absolute directories to tokens, e.g. `['/srv/releases/build-1' => '<deploy>']` | Normalizes changing deployment paths to stable tokens. Map equivalent release directories to the same token to prevent path changes alone from splitting an error's identity. |
+| `fingerprint.include_release` | `false` | Includes the event's release in the identity when enabled, so different releases get separate fingerprints and cooldowns. They still share the namespace's global quota. |
+| `fingerprint.include_line` | `true` | Includes stack frame line numbers in automatic identity. Disabling it avoids splitting an otherwise identical error solely because its line number moved. |
+| `fingerprint.max_frames` | 5; range 1–20 | Maximum frames used per selected stack trace, starting nearest the failure. Prefers SDK-marked application frames; falls back to other frames when none are marked. |
+| `fingerprint.normalization_rules` | `[]`; ordered `['pattern' => '/order_id=[0-9]+/', 'replacement' => 'order_id=<id>']` pairs | Applies custom PCRE replacements after built-in normalization to identity text eligible for normalization. Use this to remove variable values that should not distinguish errors. Custom Sentry fingerprint components keep their exact contents. |
+| `fingerprint.strategy_id` | `default-fp-v1`; custom strategy requires an explicit stable ID | Identifies the fingerprint algorithm in the stored policy. A custom `FingerprintStrategyInterface` implementation is supplied separately to `Factory::create()`; this setting does not load one. Change the ID whenever custom logic changes and keep it consistent across workers. |
 
 Fingerprinting uses prepared exceptions in SDK order, types, messages and application frames nearest the failure. Message parameters are excluded when a template is available. UUIDs, address tokens, whitespace and configured roots are normalized conservatively; meaningful numbers, status codes, SQLSTATE, function names and lines remain distinct. Custom Sentry fingerprint components preserve their exact content and order; `{{ default }}` expands to the local automatic signature. These signatures do not implement Sentry's server grouping algorithm.
 
@@ -113,6 +131,97 @@ JSON stores one namespace snapshot in `sha256(namespace)/state.json`, with perma
 Directories/files default to 0700/0600 on Unix. Windows needs restricted service ACLs; chmod is not an ACL substitute. Use private paths outside webroot/deployment cleanup. Known symlinks and nonlocal paths are rejected; portable PHP cannot eliminate every filesystem race/reparse-point issue. NFS, SMB and unverified shared volumes are unsupported. Verify a new host/filesystem with doctor and concurrency tests.
 
 Lock deadlines bound waiting, not stalled OS syscalls. Failures are suppressed and do not claim durable counts. JSON provides process-crash atomicity; PHP 7.4 flush/rename does not promise power-loss/kernel-crash durability. SQLite FULL improves durability subject to filesystem/hardware behavior.
+
+## Service user and PHP-FPM verification
+
+Run `init`, `doctor`, `stats` and `cleanup` as the account used by the application's PHP-FPM pool. For a pool running as `www-data:www-data`, use the following Linux examples (replace paths and account names for your deployment):
+
+```sh
+sudo install -d -o www-data -g www-data -m 0700 /var/lib/sentry-dedupe/orders
+sudo -u www-data /usr/bin/php /srv/orders/vendor/bin/sentry-dedupe init --config=/srv/orders/dedupe.php
+sudo -u www-data /usr/bin/php /srv/orders/vendor/bin/sentry-dedupe doctor --config=/srv/orders/dedupe.php --format=json
+```
+
+Set `sqlite.path` to `/var/lib/sentry-dedupe/orders/state.sqlite` in this example. Initialize before serving traffic. Running init as root can leave files inaccessible to PHP-FPM: the package uses private file permissions. The service account needs read access to the configuration/autoloader and read/write access to storage, including the directory where SQLite creates its sidecar files. For separate FPM pool accounts, use a separate storage directory/database for each account.
+
+Install cleanup in the service account's crontab with `sudo crontab -u www-data -e`:
+
+```cron
+10 * * * * /usr/bin/php /srv/orders/vendor/bin/sentry-dedupe cleanup --config=/srv/orders/dedupe.php --limit=1000
+```
+
+The crontab above already runs as `www-data`; its command does not need `sudo`. Preserve the database, sidecars and permanent lockfiles during deployment and log rotation.
+
+### Test CLI and FPM separately
+
+A successful CLI doctor report contains `"healthy": true`. It checks stored state/policy, SQLite integrity/settings and real two-process locking. The locking probe requires `proc_open` and a working CLI PHP binary. Running CLI as the FPM account checks that account's filesystem permissions, but does not exercise the FPM runtime: CLI and FPM can load different PHP versions, `php.ini` files, extensions and access restrictions. Native `sqlite3` must be enabled in both; `pdo_sqlite` alone is insufficient.
+
+To verify actual observation writes and subsequent reads in each runtime, temporarily save the following as `/srv/orders/dedupe-test.php`. It uses the existing, initialized application configuration and never calls Sentry's transport:
+
+```php
+<?php
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Kgkg\SentryDedupe\Factory;
+use Kgkg\SentryDedupe\StatsQuery;
+use Sentry\Event;
+
+$ok = false;
+$result = [
+    'sapi' => PHP_SAPI,
+    'php' => PHP_VERSION,
+    'php_ini' => php_ini_loaded_file(),
+    'sqlite3' => extension_loaded('sqlite3'),
+];
+
+try {
+    $config = require __DIR__ . '/dedupe.php';
+    $event = Event::createEvent()
+        ->setMessage('sentry-dedupe storage test')
+        ->setFingerprint(['dedupe-storage-test', bin2hex(random_bytes(16))]);
+
+    $first = Factory::create($config)->evaluate($event);
+    // A fresh instance must see the first observation's persisted state.
+    $second = Factory::create($config)->evaluate($event);
+    $stats = Factory::store($config)->stats(StatsQuery::fromArray([
+        'fingerprint' => $first->fingerprint(),
+    ]))->toArray();
+    $record = $stats['fingerprints'][0] ?? [];
+
+    $ok = $first->reason() === 'admit'
+        && $second->reason() === 'duplicate'
+        && ($record['total_seen'] ?? null) === 2
+        && ($record['total_admitted'] ?? null) === 1;
+    $result += [
+        'first' => $first->reason(),
+        'second' => $second->reason(),
+        'record' => $record,
+    ];
+} catch (\Throwable $e) {
+    $result['error'] = $e->getMessage();
+}
+
+if (PHP_SAPI !== 'cli') {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code($ok ? 200 : 503);
+}
+echo json_encode(['ok' => $ok] + $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+if (PHP_SAPI === 'cli') { exit($ok ? 0 : 1); }
+```
+
+Run it through CLI as the service account:
+
+```sh
+sudo -u www-data /usr/bin/php /srv/orders/dedupe-test.php
+```
+
+Then expose it temporarily through an authenticated or network-restricted HTTP route handled by the application's actual FPM pool. If your public document root is `/srv/orders/public`, place a temporary wrapper there that requires `/srv/orders/dedupe-test.php`; keep the configuration and storage outside the public directory. Request that protected route through your web server. Do not accept a configuration path from request parameters.
+
+Both runs should return `"ok": true`, `"first": "admit"`, `"second": "duplicate"`, and a record with `total_seen: 2` and `total_admitted: 1`. For FPM, `sapi` should be `fpm-fcgi`. The HTTP status is 200 on success or 503 on failure; CLI returns 0 or 1 respectively.
+
+Each invocation creates a new fingerprint and, on success, consumes one admission in the configured namespace even though nothing is sent to Sentry. An exhausted quota (`global_limit`) or fingerprint capacity (`capacity`) also fails the test without implying broken storage. Use a separately initialized test namespace in the same database if production counters/budget must remain untouched; that verifies storage access, while CLI doctor with the production config verifies its stored policy/state. Remove the script, wrapper and temporary route after testing. Do not use this write test as a recurring public health endpoint: it changes state and reveals runtime details. Do not evaluate a real event here and then pass that same occurrence through `before_send` again.
 
 ## Operations and recovery
 
@@ -141,6 +250,47 @@ Start new workers after apply. Admission times, lifetime sums and current usage 
 For corruption or lost files, stop traffic/workers first, inspect permissions/disk/doctor output and preserve evidence. There is no automatic recovery from temporary files or old backups. Deliberate repair/restoration/reset can admit an error again and may reset quota history. JSON interrupted initialization with a marked lock and missing snapshot requires deliberate operator recovery; init will not silently reset it. Never delete live SQLite journal/WAL/SHM sidecars. A backup restored to an earlier point loses deduplication guarantees for the lost history.
 
 Diagnostics are disabled by default. An optional independent callable receives only safe reason/backend metadata, at most once per reason per 60 monotonic seconds per instance. It must not use Sentry, the application's database, or a Sentry-backed logging handler. Its exceptions and recursive invocations are contained; diagnostics cannot replace durable counts during storage failure.
+
+### Separate diagnostic log
+
+To record dedupe's own failures independently, prepare a private log directory/file writable by the same service account. For example:
+
+```sh
+sudo install -d -o www-data -g www-data -m 0700 /var/log/sentry-dedupe
+sudo -u www-data touch /var/log/sentry-dedupe/orders.log
+sudo chmod 0600 /var/log/sentry-dedupe/orders.log
+```
+
+Pass the diagnostic callback as the fourth argument to `Factory::create()` in the application bootstrap. It is not a `Config::fromArray()` setting:
+
+```php
+$config = require __DIR__ . '/dedupe.php';
+$dedupe = \Kgkg\SentryDedupe\Factory::create(
+    $config,
+    null,
+    null,
+    static function (string $reason, array $metadata): void {
+        // Diagnostics also receive normal decisions such as admit/duplicate.
+        // Keep this file focused on failures.
+        if (substr($reason, -6) !== '_error') { return; }
+
+        error_log(
+            gmdate('c') . ' reason=' . $reason
+            . ' backend=' . $metadata['backend'] . PHP_EOL,
+            3,
+            '/var/log/sentry-dedupe/orders.log'
+        );
+    }
+);
+
+// Use this instance in Sentry's before_send callback as shown above.
+```
+
+`error_log` message type 3 appends directly to the named file rather than using the configured PHP error log. Use a different filename per application when they need separate diagnostic logs, and keep logs outside the webroot. Configure rotation to recreate the file with the service account's ownership and private permissions; rotate the diagnostic log only, never the SQLite database or its sidecars.
+
+This example logs `storage_error` (including missing `sqlite3`, inaccessible storage, lock failures or policy mismatch), `fingerprint_error` and `callback_error`. The callback receives a generic reason/backend, not the underlying exception text or event payload. Use CLI `doctor` as the service account and the FPM test above to investigate storage failures. With these failures, `before_send` drops the event; there is no automatic retry or fallback backend.
+
+The 60-second suppression is per reason **per dedupe instance**, not per server or FPM pool. Separate requests that construct new instances can therefore produce separate log entries. Diagnostic logging is best effort: an unwritable log or callback failure does not reopen admission or guarantee another warning. Verify the diagnostic file's permissions separately from the database.
 
 ## Development and evidence
 
