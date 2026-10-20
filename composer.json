@@ -1,0 +1,21 @@
+{
+    "name": "kgkg/sentry-dedupe",
+    "description": "Fail-closed persistent admission control for Sentry PHP events",
+    "type": "library",
+    "license": "MIT",
+    "require": {"php": "^7.4 || ^8.0", "ext-json": "*", "sentry/sentry": "^4.0"},
+    "require-dev": {"phpunit/phpunit": "^9.6", "phpstan/phpstan": "^1.12"},
+    "suggest": {"ext-sqlite3": "Required for the native SQLite backend"},
+    "autoload": {"psr-4": {"Kgkg\\SentryDedupe\\": "src/"}},
+    "autoload-dev": {"psr-4": {"Kgkg\\SentryDedupe\\Tests\\": "tests/"}},
+    "bin": ["bin/sentry-dedupe"],
+    "scripts": {
+        "test": "phpunit",
+        "test:contract": "phpunit --testsuite Contract",
+        "test:concurrency": "@php tests/Concurrency/run.php",
+        "analyse": "phpstan analyse --memory-limit=512M",
+        "lint": "@php tools/lint.php",
+        "benchmark": "@php tools/benchmark.php"
+    },
+    "config": {"sort-packages": true}
+}

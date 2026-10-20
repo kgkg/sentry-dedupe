@@ -1,0 +1,296 @@
+{
+    "php": "7.4.33",
+    "os": "Linux",
+    "sdk": "4.34.0",
+    "sqlite": {
+        "versionString": "3.34.1",
+        "versionNumber": 3034001
+    },
+    "runs": [
+        {
+            "backend": "json",
+            "iteration": 0,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 307.4
+        },
+        {
+            "backend": "json",
+            "iteration": 1,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 272.3
+        },
+        {
+            "backend": "json",
+            "iteration": 2,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 270.4
+        },
+        {
+            "backend": "json",
+            "iteration": 3,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 262.8
+        },
+        {
+            "backend": "json",
+            "iteration": 4,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 282.7
+        },
+        {
+            "backend": "json",
+            "iteration": 5,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 269.8
+        },
+        {
+            "backend": "json",
+            "iteration": 6,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 271.9
+        },
+        {
+            "backend": "json",
+            "iteration": 7,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 292.7
+        },
+        {
+            "backend": "json",
+            "iteration": 8,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 284.5
+        },
+        {
+            "backend": "json",
+            "iteration": 9,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 283.1
+        },
+        {
+            "backend": "json",
+            "iteration": 10,
+            "mode": "distinct",
+            "workers": 32,
+            "results": {
+                "admit": 10,
+                "global_limit": 490
+            },
+            "wall_ms": 1140.4
+        },
+        {
+            "backend": "json",
+            "iteration": 11,
+            "mode": "mixed",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 302.8
+        },
+        {
+            "backend": "json",
+            "iteration": 12,
+            "mode": "init",
+            "workers": 32,
+            "results": {
+                "initialized": 32
+            },
+            "wall_ms": 151.8
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 0,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3421.5
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 1,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3638.4
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 2,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3412.4
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 3,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3631.3
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 4,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3496.9
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 5,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3672.3
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 6,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3550.6
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 7,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3424.2
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 8,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3562.5
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 9,
+            "mode": "same",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3458.6
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 10,
+            "mode": "distinct",
+            "workers": 32,
+            "results": {
+                "admit": 10,
+                "global_limit": 490
+            },
+            "wall_ms": 4090.2
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 11,
+            "mode": "mixed",
+            "workers": 32,
+            "results": {
+                "admit": 1,
+                "duplicate": 499
+            },
+            "wall_ms": 3664.1
+        },
+        {
+            "backend": "sqlite",
+            "iteration": 12,
+            "mode": "init",
+            "workers": 32,
+            "results": {
+                "initialized": 32
+            },
+            "wall_ms": 239.7
+        }
+    ],
+    "passed": true
+}

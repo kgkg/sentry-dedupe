@@ -1,0 +1,63 @@
+name: CI
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  compatibility:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+        dependencies: [normal, lowest]
+        include:
+          - {os: windows-2022, php: '7.4', dependencies: normal}
+          - {os: windows-2022, php: '8.5', dependencies: normal}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, sqlite3
+          coverage: none
+          tools: composer:v2
+      - run: composer validate --strict
+      - if: matrix.dependencies == 'normal'
+        run: composer update --no-interaction --prefer-dist
+      - if: matrix.dependencies == 'lowest'
+        run: composer update sentry/sentry:4.0.0 --with-all-dependencies --prefer-lowest --prefer-dist --no-interaction
+      - run: composer check-platform-reqs
+      - run: php tools/environment.php
+      - run: composer lint
+      - run: composer test
+      - run: composer test:contract
+      - run: composer test:concurrency
+      - run: composer analyse
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-${{ matrix.os }}-php${{ matrix.php }}-${{ matrix.dependencies }}
+          path: |
+            composer.lock
+            .cache/concurrency-*.json
+            .cache/environment.json
+  extension-isolation:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        backend: [json, sqlite]
+        php: ['7.4', '8.5']
+    env:
+      SENTRY_DEDUPE_BACKEND: ${{ matrix.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, sqlite3, :pdo, :pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction
+      - if: matrix.backend == 'json'
+        run: sudo phpdismod sqlite3
+      - run: php tests/isolation.php
+      - run: composer test
+      - run: composer test:concurrency

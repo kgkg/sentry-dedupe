@@ -1,0 +1,1 @@
+{"isolation":true,"backend":"json","php":"8.3.6","extensions":["Core","date","libxml","openssl","pcre","zlib","filter","hash","json","pcntl","random","Reflection","SPL","session","standard","sodium","curl","mbstring","dom","xml","xmlwriter","xmlreader","SimpleXML","tokenizer"]}

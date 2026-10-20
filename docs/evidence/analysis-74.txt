@@ -1,0 +1,18 @@
+
+ [OK] No errors                                                                                                        
+
+es was released on July 17th 2025,
+that's 460 days ago.
+
+Since then more than 65 new PHPStan versions were released
+with hundreds of new features, bugfixes, and other
+quality of life improvements.
+
+To learn about what you're missing out on, check out
+this blog with articles about the latest major releases:
+https://phpstan.org/blog
+
+Upgrade today to PHPStan 2.2 or newer by using
+"phpstan/phpstan": "^2.2" in your composer.json.
+
+Note: Using configuration file C:\usr\packages\sentry-dedupe\phpstan.neon.dist.

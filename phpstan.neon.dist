@@ -1,0 +1,8 @@
+parameters:
+    level: 6
+    phpVersion: 70400
+    paths:
+        - src
+    tmpDir: .cache/phpstan
+    ignoreErrors:
+        - identifier: missingType.iterableValue
